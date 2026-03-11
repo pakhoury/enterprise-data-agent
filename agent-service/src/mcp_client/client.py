@@ -1,6 +1,6 @@
-"""MCP Client Manager — connects to multiple Oracle MCP servers.
+"""MCP Client Manager — connects to multiple Oracle MCP servers via Streamable HTTP.
 
-Each warehouse gets its own MCP client session. The manager provides
+Each warehouse gets its own MCP client session over HTTP. The manager provides
 a unified interface for the agent to call tools across warehouses.
 """
 
@@ -10,8 +10,8 @@ import json
 from typing import Any
 
 import structlog
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
 
 from src.config import WarehouseConfig
 
@@ -19,12 +19,12 @@ logger = structlog.get_logger(__name__)
 
 
 class McpWarehouseClient:
-    """MCP client for a single Oracle warehouse."""
+    """MCP client for a single Oracle warehouse via Streamable HTTP."""
 
     def __init__(self, config: WarehouseConfig) -> None:
         self._config = config
         self._session: ClientSession | None = None
-        self._stdio_context: Any = None
+        self._http_context: Any = None
         self._session_context: Any = None
 
     @property
@@ -40,25 +40,34 @@ class McpWarehouseClient:
         return self._session is not None
 
     async def connect(self) -> None:
-        """Establish MCP connection to the warehouse server."""
+        """Establish MCP connection to the warehouse server via Streamable HTTP."""
         try:
-            server_params = StdioServerParameters(
-                command=self._config.mcp_command,
-                args=self._config.mcp_args,
-                cwd=self._config.mcp_cwd if self._config.mcp_cwd else None,
-                env={**self._config.mcp_env} if self._config.mcp_env else None,
+            url = self._config.mcp_url
+            logger.info(
+                "mcp_client_connecting",
+                warehouse=self._config.warehouse_id,
+                url=url,
             )
 
-            self._stdio_context = stdio_client(server_params)
-            read_stream, write_stream = await self._stdio_context.__aenter__()
+            self._http_context = streamable_http_client(url)
+            read_stream, write_stream = await self._http_context.__aenter__()
 
             self._session_context = ClientSession(read_stream, write_stream)
             self._session = await self._session_context.__aenter__()
             await self._session.initialize()
 
-            logger.info("mcp_client_connected", warehouse=self._config.warehouse_id, label=self._config.label)
+            logger.info(
+                "mcp_client_connected",
+                warehouse=self._config.warehouse_id,
+                label=self._config.label,
+                url=url,
+            )
         except Exception as exc:
-            logger.error("mcp_client_connect_failed", warehouse=self._config.warehouse_id, error=str(exc))
+            logger.error(
+                "mcp_client_connect_failed",
+                warehouse=self._config.warehouse_id,
+                error=str(exc),
+            )
             raise
 
     async def disconnect(self) -> None:
@@ -66,12 +75,16 @@ class McpWarehouseClient:
         try:
             if self._session_context:
                 await self._session_context.__aexit__(None, None, None)
-            if self._stdio_context:
-                await self._stdio_context.__aexit__(None, None, None)
+            if self._http_context:
+                await self._http_context.__aexit__(None, None, None)
             self._session = None
             logger.info("mcp_client_disconnected", warehouse=self._config.warehouse_id)
         except Exception as exc:
-            logger.warning("mcp_client_disconnect_error", warehouse=self._config.warehouse_id, error=str(exc))
+            logger.warning(
+                "mcp_client_disconnect_error",
+                warehouse=self._config.warehouse_id,
+                error=str(exc),
+            )
 
     async def list_tools(self) -> list[dict[str, Any]]:
         """List available tools on the MCP server."""
@@ -93,7 +106,12 @@ class McpWarehouseClient:
         if not self._session:
             raise RuntimeError(f"MCP client for {self._config.warehouse_id} not connected")
 
-        logger.debug("mcp_tool_call", warehouse=self._config.warehouse_id, tool=tool_name, args=arguments)
+        logger.debug(
+            "mcp_tool_call",
+            warehouse=self._config.warehouse_id,
+            tool=tool_name,
+            args=arguments,
+        )
 
         result = await self._session.call_tool(tool_name, arguments)
 
@@ -122,7 +140,7 @@ class McpWarehouseClient:
 
 
 class McpClientManager:
-    """Manages MCP client connections to multiple warehouses."""
+    """Manages MCP client connections to multiple warehouses via Streamable HTTP."""
 
     def __init__(self) -> None:
         self._clients: dict[str, McpWarehouseClient] = {}
@@ -139,7 +157,7 @@ class McpClientManager:
         return self._clients[warehouse_id]
 
     async def register_warehouse(self, config: WarehouseConfig) -> None:
-        """Register and connect to a new warehouse MCP server."""
+        """Register and connect to a new warehouse MCP server via HTTP."""
         client = McpWarehouseClient(config)
         await client.connect()
         self._clients[config.warehouse_id] = client

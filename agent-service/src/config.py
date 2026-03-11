@@ -2,19 +2,15 @@
 
 from __future__ import annotations
 
-from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class WarehouseConfig(BaseSettings):
-    """Configuration for a single MCP warehouse connection."""
+    """Configuration for a single MCP warehouse connection via Streamable HTTP."""
 
     warehouse_id: str
     label: str
-    mcp_command: str = "python"
-    mcp_args: list[str] = Field(default_factory=lambda: ["-m", "src.server"])
-    mcp_cwd: str = "/app/mcp-server"
-    mcp_env: dict[str, str] = Field(default_factory=dict)
+    mcp_url: str = "http://localhost:8080/mcp"
 
 
 class RedisConfig(BaseSettings):

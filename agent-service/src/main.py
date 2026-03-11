@@ -67,10 +67,7 @@ def _load_warehouse_configs() -> list[WarehouseConfig]:
         WarehouseConfig(
             warehouse_id=os.getenv("MCP_WAREHOUSE_ID", "hq"),
             label=os.getenv("MCP_WAREHOUSE_LABEL", "HQ Warehouse"),
-            mcp_command=os.getenv("MCP_COMMAND", "python"),
-            mcp_args=os.getenv("MCP_ARGS", "-m,src.server").split(","),
-            mcp_cwd=os.getenv("MCP_CWD", "/app/mcp-server"),
-            mcp_env=json.loads(os.getenv("MCP_ENV", "{}")),
+            mcp_url=os.getenv("MCP_URL", "http://localhost:8080/mcp"),
         )
     ]
 

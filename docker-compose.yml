@@ -21,7 +21,7 @@ services:
       - eda-network
 
   # ---------------------------------------------------------------------------
-  # MCP Server — Oracle warehouse: HQ
+  # MCP Server — Oracle warehouse: HQ (Streamable HTTP on port 8082)
   # Duplicate this block for each warehouse (east, west, etc.)
   # ---------------------------------------------------------------------------
   mcp-server-hq:
@@ -29,6 +29,8 @@ services:
       context: ./mcp-server
       dockerfile: Dockerfile
     container_name: eda-mcp-hq
+    ports:
+      - "8082:8080"
     environment:
       ORACLE_HOST: ${ORACLE_HQ_HOST:-oracle-hq}
       ORACLE_PORT: ${ORACLE_HQ_PORT:-1521}
@@ -40,17 +42,27 @@ services:
       MCP_WAREHOUSE_LABEL: "HQ Warehouse"
       MCP_READ_ONLY: "true"
       MCP_MAX_ROWS: "1000"
+      MCP_HTTP_HOST: "0.0.0.0"
+      MCP_HTTP_PORT: "8080"
       MCP_LOG_LEVEL: INFO
     networks:
       - eda-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/mcp"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
-  # MCP Server — Oracle warehouse: East
+  # MCP Server — Oracle warehouse: East (Streamable HTTP on port 8083)
   mcp-server-east:
     build:
       context: ./mcp-server
       dockerfile: Dockerfile
     container_name: eda-mcp-east
+    ports:
+      - "8083:8080"
     environment:
       ORACLE_HOST: ${ORACLE_EAST_HOST:-oracle-east}
       ORACLE_PORT: ${ORACLE_EAST_PORT:-1521}
@@ -62,17 +74,27 @@ services:
       MCP_WAREHOUSE_LABEL: "East Region Warehouse"
       MCP_READ_ONLY: "true"
       MCP_MAX_ROWS: "1000"
+      MCP_HTTP_HOST: "0.0.0.0"
+      MCP_HTTP_PORT: "8080"
       MCP_LOG_LEVEL: INFO
     networks:
       - eda-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/mcp"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
-  # MCP Server — Oracle warehouse: West
+  # MCP Server — Oracle warehouse: West (Streamable HTTP on port 8084)
   mcp-server-west:
     build:
       context: ./mcp-server
       dockerfile: Dockerfile
     container_name: eda-mcp-west
+    ports:
+      - "8084:8080"
     environment:
       ORACLE_HOST: ${ORACLE_WEST_HOST:-oracle-west}
       ORACLE_PORT: ${ORACLE_WEST_PORT:-1521}
@@ -84,10 +106,18 @@ services:
       MCP_WAREHOUSE_LABEL: "West Region Warehouse"
       MCP_READ_ONLY: "true"
       MCP_MAX_ROWS: "1000"
+      MCP_HTTP_HOST: "0.0.0.0"
+      MCP_HTTP_PORT: "8080"
       MCP_LOG_LEVEL: INFO
     networks:
       - eda-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/mcp"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ---------------------------------------------------------------------------
   # Agent Service — Python LangGraph + RAG + MCP Client
@@ -127,11 +157,11 @@ services:
       redis:
         condition: service_healthy
       mcp-server-hq:
-        condition: service_started
+        condition: service_healthy
       mcp-server-east:
-        condition: service_started
+        condition: service_healthy
       mcp-server-west:
-        condition: service_started
+        condition: service_healthy
     networks:
       - eda-network
     restart: unless-stopped
