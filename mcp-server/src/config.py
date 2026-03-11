@@ -34,6 +34,6 @@ class ServerConfig(BaseSettings):
     max_rows: int = 1000
     query_timeout: int = 60
     log_level: str = "INFO"
-    transport: str = "stdio"
-    sse_host: str = "0.0.0.0"
-    sse_port: int = 8080
+    transport: str = "streamable-http"
+    http_host: str = "0.0.0.0"
+    http_port: int = 8080

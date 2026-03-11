@@ -36,9 +36,9 @@ Production-quality multi-warehouse AI agent that queries Oracle databases using 
 
 | Component | Tech | Port | Description |
 |-----------|------|------|-------------|
-| Java Backend | Spring Boot 3.4, Java 21 | 8080 | REST API, Redis cache, auth |
+| Java Backend | Spring Boot 3.4, Java 17 | 8080 | REST API, Redis cache, auth |
 | Agent Service | Python 3.11, LangGraph, FastAPI | 8001 | AI agent orchestration, RAG, MCP client |
-| MCP Servers | Python 3.11, MCP SDK | stdio | Oracle DB access (one per warehouse) |
+| MCP Servers | Python 3.11, MCP SDK, Streamable HTTP | 8080 (per container) | Oracle DB access (one per warehouse) |
 | Redis | Redis 7 | 6379 | Query result cache |
 | ChromaDB | Embedded | — | Vector store for table metadata |
 
@@ -58,28 +58,20 @@ cp .env.example .env
 
 ### 2. Configure warehouses
 
-Edit `config/warehouses.json` to match your Oracle instances:
+Edit `config/warehouses.json` to match your Oracle instances.
+Each warehouse is accessed via its MCP server's Streamable HTTP endpoint:
 
 ```json
 [
   {
     "warehouse_id": "hq",
     "label": "HQ Warehouse",
-    "mcp_command": "python",
-    "mcp_args": ["-m", "src.server"],
-    "mcp_cwd": "/app/mcp-server",
-    "mcp_env": {
-      "ORACLE_HOST": "your-oracle-host",
-      "ORACLE_PORT": "1521",
-      "ORACLE_SERVICE_NAME": "ORCL",
-      "ORACLE_USER": "readonly_user",
-      "ORACLE_PASSWORD": "your-password",
-      "MCP_WAREHOUSE_ID": "hq",
-      "MCP_READ_ONLY": "true"
-    }
+    "mcp_url": "http://mcp-server-hq:8080/mcp"
   }
 ]
 ```
+
+Oracle connection details are configured per MCP server container via environment variables in `docker-compose.yml`.
 
 ### 3. Start services
 

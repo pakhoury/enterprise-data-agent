@@ -2,55 +2,16 @@
   {
     "warehouse_id": "hq",
     "label": "HQ Warehouse",
-    "mcp_command": "python",
-    "mcp_args": ["-m", "src.server"],
-    "mcp_cwd": "/app/mcp-server",
-    "mcp_env": {
-      "ORACLE_HOST": "oracle-hq",
-      "ORACLE_PORT": "1521",
-      "ORACLE_SERVICE_NAME": "ORCL",
-      "ORACLE_USER": "readonly_user",
-      "ORACLE_PASSWORD": "changeme",
-      "MCP_SERVER_NAME": "oracle-hq",
-      "MCP_WAREHOUSE_ID": "hq",
-      "MCP_WAREHOUSE_LABEL": "HQ Warehouse",
-      "MCP_READ_ONLY": "true"
-    }
+    "mcp_url": "http://mcp-server-hq:8080/mcp"
   },
   {
     "warehouse_id": "east",
     "label": "East Region Warehouse",
-    "mcp_command": "python",
-    "mcp_args": ["-m", "src.server"],
-    "mcp_cwd": "/app/mcp-server",
-    "mcp_env": {
-      "ORACLE_HOST": "oracle-east",
-      "ORACLE_PORT": "1521",
-      "ORACLE_SERVICE_NAME": "ORCL",
-      "ORACLE_USER": "readonly_user",
-      "ORACLE_PASSWORD": "changeme",
-      "MCP_SERVER_NAME": "oracle-east",
-      "MCP_WAREHOUSE_ID": "east",
-      "MCP_WAREHOUSE_LABEL": "East Region Warehouse",
-      "MCP_READ_ONLY": "true"
-    }
+    "mcp_url": "http://mcp-server-east:8080/mcp"
   },
   {
     "warehouse_id": "west",
     "label": "West Region Warehouse",
-    "mcp_command": "python",
-    "mcp_args": ["-m", "src.server"],
-    "mcp_cwd": "/app/mcp-server",
-    "mcp_env": {
-      "ORACLE_HOST": "oracle-west",
-      "ORACLE_PORT": "1521",
-      "ORACLE_SERVICE_NAME": "ORCL",
-      "ORACLE_USER": "readonly_user",
-      "ORACLE_PASSWORD": "changeme",
-      "MCP_SERVER_NAME": "oracle-west",
-      "MCP_WAREHOUSE_ID": "west",
-      "MCP_WAREHOUSE_LABEL": "West Region Warehouse",
-      "MCP_READ_ONLY": "true"
-    }
+    "mcp_url": "http://mcp-server-west:8080/mcp"
   }
 ]
