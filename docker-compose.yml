@@ -1,0 +1,184 @@
+version: "3.9"
+
+services:
+  # ---------------------------------------------------------------------------
+  # Redis — shared cache between Java backend and Python agent
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: eda-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - eda-network
+
+  # ---------------------------------------------------------------------------
+  # MCP Server — Oracle warehouse: HQ
+  # Duplicate this block for each warehouse (east, west, etc.)
+  # ---------------------------------------------------------------------------
+  mcp-server-hq:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: eda-mcp-hq
+    environment:
+      ORACLE_HOST: ${ORACLE_HQ_HOST:-oracle-hq}
+      ORACLE_PORT: ${ORACLE_HQ_PORT:-1521}
+      ORACLE_SERVICE_NAME: ${ORACLE_HQ_SERVICE_NAME:-ORCL}
+      ORACLE_USER: ${ORACLE_HQ_USER:-readonly_user}
+      ORACLE_PASSWORD: ${ORACLE_HQ_PASSWORD:-changeme}
+      MCP_SERVER_NAME: oracle-hq
+      MCP_WAREHOUSE_ID: hq
+      MCP_WAREHOUSE_LABEL: "HQ Warehouse"
+      MCP_READ_ONLY: "true"
+      MCP_MAX_ROWS: "1000"
+      MCP_LOG_LEVEL: INFO
+    networks:
+      - eda-network
+    restart: unless-stopped
+
+  # MCP Server — Oracle warehouse: East
+  mcp-server-east:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: eda-mcp-east
+    environment:
+      ORACLE_HOST: ${ORACLE_EAST_HOST:-oracle-east}
+      ORACLE_PORT: ${ORACLE_EAST_PORT:-1521}
+      ORACLE_SERVICE_NAME: ${ORACLE_EAST_SERVICE_NAME:-ORCL}
+      ORACLE_USER: ${ORACLE_EAST_USER:-readonly_user}
+      ORACLE_PASSWORD: ${ORACLE_EAST_PASSWORD:-changeme}
+      MCP_SERVER_NAME: oracle-east
+      MCP_WAREHOUSE_ID: east
+      MCP_WAREHOUSE_LABEL: "East Region Warehouse"
+      MCP_READ_ONLY: "true"
+      MCP_MAX_ROWS: "1000"
+      MCP_LOG_LEVEL: INFO
+    networks:
+      - eda-network
+    restart: unless-stopped
+
+  # MCP Server — Oracle warehouse: West
+  mcp-server-west:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: eda-mcp-west
+    environment:
+      ORACLE_HOST: ${ORACLE_WEST_HOST:-oracle-west}
+      ORACLE_PORT: ${ORACLE_WEST_PORT:-1521}
+      ORACLE_SERVICE_NAME: ${ORACLE_WEST_SERVICE_NAME:-ORCL}
+      ORACLE_USER: ${ORACLE_WEST_USER:-readonly_user}
+      ORACLE_PASSWORD: ${ORACLE_WEST_PASSWORD:-changeme}
+      MCP_SERVER_NAME: oracle-west
+      MCP_WAREHOUSE_ID: west
+      MCP_WAREHOUSE_LABEL: "West Region Warehouse"
+      MCP_READ_ONLY: "true"
+      MCP_MAX_ROWS: "1000"
+      MCP_LOG_LEVEL: INFO
+    networks:
+      - eda-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Agent Service — Python LangGraph + RAG + MCP Client
+  # ---------------------------------------------------------------------------
+  agent-service:
+    build:
+      context: ./agent-service
+      dockerfile: Dockerfile
+    container_name: eda-agent
+    ports:
+      - "8001:8001"
+    environment:
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DEFAULT_TTL: 3600
+      REDIS_SALES_TTL: 300
+      REDIS_TARGETS_TTL: 3600
+      # RAG
+      RAG_COLLECTION_NAME: warehouse_metadata
+      RAG_PERSIST_DIRECTORY: /data/chromadb
+      # LLM
+      LLM_PROVIDER: openai
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o}
+      LLM_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_TEMPERATURE: "0.1"
+      LLM_MAX_TOKENS: "4096"
+      # Agent
+      AGENT_HOST: "0.0.0.0"
+      AGENT_PORT: "8001"
+      AGENT_LOG_LEVEL: INFO
+      AGENT_WAREHOUSES_CONFIG_PATH: /app/config/warehouses.json
+    volumes:
+      - agent-data:/data
+      - ./config:/app/config:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      mcp-server-hq:
+        condition: service_started
+      mcp-server-east:
+        condition: service_started
+      mcp-server-west:
+        condition: service_started
+    networks:
+      - eda-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Java Backend — Spring Boot REST API
+  # ---------------------------------------------------------------------------
+  java-backend:
+    build:
+      context: ./java-backend
+      dockerfile: Dockerfile
+    container_name: eda-backend
+    ports:
+      - "8080:8080"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AGENT_SERVICE_URL: http://agent-service:8001
+      AGENT_TIMEOUT_SECONDS: 120
+      LOG_LEVEL: INFO
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      agent-service:
+        condition: service_started
+    networks:
+      - eda-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+volumes:
+  redis-data:
+  agent-data:
+
+networks:
+  eda-network:
+    driver: bridge

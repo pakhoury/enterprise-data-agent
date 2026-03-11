@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "oracle-mcp-server"
+version = "1.0.0"
+description = "MCP Server for Oracle Database warehouses - exposes read-only SQL execution, schema discovery, and table descriptions via Model Context Protocol"
+authors = ["Enterprise Data Team"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+mcp = "^1.2.0"
+oracledb = "^2.5.0"
+pydantic = "^2.10.0"
+pydantic-settings = "^2.7.0"
+python-dotenv = "^1.0.1"
+structlog = "^24.4.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-asyncio = "^0.25.0"
+ruff = "^0.8.0"
+
+[tool.poetry.scripts]
+mcp-server = "src.server:main"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
